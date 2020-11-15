@@ -22,8 +22,11 @@ config.h:
 
 $(OBJ): arg.h config.h config.mk drw.h
 
-dmenu: dmenu.o drw.o util.o
+dmenu: patches dmenu.o drw.o util.o
 	$(CC) -o $@ dmenu.o drw.o util.o $(LDFLAGS)
+
+patches:
+	git apply patches/*
 
 stest: stest.o
 	$(CC) -o $@ stest.o $(LDFLAGS)
@@ -61,4 +64,4 @@ uninstall:
 		$(DESTDIR)$(MANPREFIX)/man1/dmenu.1\
 		$(DESTDIR)$(MANPREFIX)/man1/stest.1
 
-.PHONY: all options clean dist install uninstall
+.PHONY: all patches options clean dist install uninstall
