@@ -1,0 +1,39 @@
+From 3f9c517df3d4852be5f0d40bf54fa0485399faab Mon Sep 17 00:00:00 2001
+From: mendess <pedro.mendes.26@gmail.com>
+Date: Sun, 15 Nov 2020 15:42:31 +0000
+Subject: [PATCH] Add border
+
+---
+ config.def.h | 2 ++
+ dmenu.c      | 3 ++-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/config.def.h b/config.def.h
+index 1edb647..fc00672 100644
+--- a/config.def.h
++++ b/config.def.h
+@@ -21,3 +21,5 @@ static unsigned int lines      = 0;
+  * for example: " /?\"&[]"
+  */
+ static const char worddelimiters[] = " ";
++
++static const unsigned int border_width = 5;
+diff --git a/dmenu.c b/dmenu.c
+index 65f25ce..e8416fa 100644
+--- a/dmenu.c
++++ b/dmenu.c
+@@ -659,9 +659,10 @@ setup(void)
+ 	swa.override_redirect = True;
+ 	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
+ 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
+-	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
++	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, border_width,
+ 	                    CopyFromParent, CopyFromParent, CopyFromParent,
+ 	                    CWOverrideRedirect | CWBackPixel | CWEventMask, &swa);
++	XSetWindowBorder(dpy, win, scheme[SchemeSel][ColBg].pixel);
+ 	XSetClassHint(dpy, win, &ch);
+ 
+ 
+-- 
+2.29.2
+
