@@ -582,6 +582,7 @@ run(void)
 				XRaiseWindow(dpy, win);
 			break;
 		}
+        printf("foo\n");
 	}
 }
 
