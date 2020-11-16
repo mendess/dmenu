@@ -1,12 +1,14 @@
 /* See LICENSE file for copyright and license details. */
 #include <ctype.h>
 #include <locale.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -87,6 +89,22 @@ calcoffsets(void)
 	for (i = 0, prev = curr; prev && prev->left; prev = prev->left)
 		if ((i += (lines > 0) ? bh : MIN(TEXTW(prev->left->text), n)) > n)
 			break;
+}
+
+static size_t
+max_textw(void)
+{
+	static size_t len = 0;
+    static bool calculated = false;
+    if (!calculated) {
+        len = 0;
+        for (struct item *item = items; item && item->text; item++){
+            /* fprintf(stderr, "testing %s\n", item->text); */
+            len = MAX(TEXTW(item->text), len);
+        }
+        calculated = true;
+    }
+	return len;
 }
 
 static void
@@ -203,8 +221,9 @@ grabkeyboard(void)
 	/* try to grab keyboard, we may have to wait for another process to ungrab */
 	for (i = 0; i < 1000; i++) {
 		if (XGrabKeyboard(dpy, DefaultRootWindow(dpy), True, GrabModeAsync,
-		                  GrabModeAsync, CurrentTime) == GrabSuccess)
+                    GrabModeAsync, CurrentTime) == GrabSuccess) {
 			return;
+        }
 		nanosleep(&ts, NULL);
 	}
 	die("cannot grab keyboard");
@@ -582,7 +601,6 @@ run(void)
 				XRaiseWindow(dpy, win);
 			break;
 		}
-        printf("foo\n");
 	}
 }
 
@@ -612,6 +630,7 @@ setup(void)
 	bh = drw->fonts->h + 2;
 	lines = MAX(lines, 0);
 	mh = (lines + 1) * bh;
+	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 #ifdef XINERAMA
 	i = 0;
 	if (parentwin == root && (info = XineramaQueryScreens(dpy, &n))) {
@@ -638,9 +657,16 @@ setup(void)
 				if (INTERSECT(x, y, 1, 1, info[i]))
 					break;
 
-		x = info[i].x_org;
-		y = info[i].y_org + (topbar ? 0 : info[i].height - mh);
-		mw = info[i].width;
+		if (centered) {
+			mw = MIN(MAX(max_textw() + promptw, min_width), info[i].width);
+			x = info[i].x_org + ((info[i].width  - mw) / 2);
+			y = info[i].y_org + ((info[i].height - mh) / 2);
+		} else {
+			x = info[i].x_org;
+			y = info[i].y_org + (topbar ? 0 : info[i].height - mh);
+			mw = info[i].width;
+		}
+
 		XFree(info);
 	} else
 #endif
@@ -648,11 +674,17 @@ setup(void)
 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
 			die("could not get embedding window attributes: 0x%lx",
 			    parentwin);
-		x = 0;
-		y = topbar ? 0 : wa.height - mh;
-		mw = wa.width;
+
+		if (centered) {
+			mw = MIN(MAX(max_textw() + promptw, min_width), wa.width);
+			x = (wa.width  - mw) / 2;
+			y = (wa.height - mh) / 2;
+		} else {
+			x = 0;
+			y = topbar ? 0 : wa.height - mh;
+			mw = wa.width;
+		}
 	}
-	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 	inputw = MIN(inputw, mw/3);
 	match();
 
@@ -660,9 +692,10 @@ setup(void)
 	swa.override_redirect = True;
 	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
-	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
+	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, border_width,
 	                    CopyFromParent, CopyFromParent, CopyFromParent,
 	                    CWOverrideRedirect | CWBackPixel | CWEventMask, &swa);
+	XSetWindowBorder(dpy, win, scheme[SchemeSel][ColBg].pixel);
 	XSetClassHint(dpy, win, &ch);
 
 
@@ -695,11 +728,35 @@ usage(void)
 	exit(1);
 }
 
+static void
+getwallcolors(void) {
+    static char buf[32] = {0};
+    int fd = open("/tmp/wall_colors", O_RDONLY);
+    if (fd < 1) {
+        perror("Failed to open '/tmp/wall_colors'");
+        return;
+    }
+    ssize_t bytes = read(fd, buf, 32);
+    if (bytes == -1) {
+        perror("Failed to read '/tmp/wall_colors'");
+        return;
+    } else if (bytes < 24) {
+        return;
+    }
+    buf[7] = '\0';
+    buf[15] = '\0';
+    buf[23] = '\0';
+    colors[SchemeNorm][ColBg] = buf + 16;
+    colors[SchemeSel][ColBg] = buf;
+}
+
 int
 main(int argc, char *argv[])
 {
 	XWindowAttributes wa;
 	int i, fast = 0;
+
+    getwallcolors();
 
 	for (i = 1; i < argc; i++)
 		/* these options take no arguments */
@@ -710,6 +767,8 @@ main(int argc, char *argv[])
 			topbar = 0;
 		else if (!strcmp(argv[i], "-f"))   /* grabs keyboard before reading stdin */
 			fast = 1;
+		else if (!strcmp(argv[i], "-t"))   /* uncenters dmenu on screen */
+			centered = 0;
 		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
 			fstrncmp = strncasecmp;
 			fstrstr = cistrstr;

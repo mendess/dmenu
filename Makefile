@@ -6,7 +6,7 @@ include config.mk
 SRC = drw.c dmenu.c stest.c util.c
 OBJ = $(SRC:.c=.o)
 
-all: patches options dmenu stest
+all: options dmenu stest
 
 options:
 	@echo dmenu build options:
@@ -25,9 +25,6 @@ $(OBJ): arg.h config.h config.mk drw.h
 dmenu: dmenu.o drw.o util.o
 	$(CC) -o $@ dmenu.o drw.o util.o $(LDFLAGS)
 
-patches:
-	git apply patches/*
-
 stest: stest.o
 	$(CC) -o $@ stest.o $(LDFLAGS)
 
@@ -42,9 +39,6 @@ dist: clean
 	tar -cf dmenu-$(VERSION).tar dmenu-$(VERSION)
 	gzip dmenu-$(VERSION).tar
 	rm -rf dmenu-$(VERSION)
-
-gco:
-	git checkout dmenu.1 dmenu.c config.def.h
 
 install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
