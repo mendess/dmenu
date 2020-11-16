@@ -1,0 +1,62 @@
+From 7a67c892493ec759e489b714080e1696f9f8da6f Mon Sep 17 00:00:00 2001
+From: mendess <pedro.mendes.26@gmail.com>
+Date: Mon, 16 Nov 2020 09:32:11 +0000
+Subject: [PATCH] wip
+
+---
+ dmenu.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/dmenu.c b/dmenu.c
+index 65f25ce..ae24631 100644
+--- a/dmenu.c
++++ b/dmenu.c
+@@ -7,6 +7,7 @@
+ #include <strings.h>
+ #include <time.h>
+ #include <unistd.h>
++#include <fcntl.h>
+ 
+ #include <X11/Xlib.h>
+ #include <X11/Xatom.h>
+@@ -694,12 +695,37 @@ usage(void)
+ 	exit(1);
+ }
+ 
++static void
++getwallcolors(void) {
++    static char buf[32] = {0};
++    int fd = open("/tmp/wall_colors", O_RDONLY);
++    if (fd < 1) {
++        perror("Failed to open '/tmp/wall_colors'");
++        return;
++    }
++    ssize_t bytes = read(fd, buf, 32);
++    if (bytes == -1) {
++        perror("Failed to read '/tmp/wall_colors'");
++        return;
++    } else if (bytes < 24) {
++        fprintf(stderr, "Unexpected EOF when reading '/tmp/wall_colors'");
++        return;
++    }
++    buf[7] = '\0';
++    buf[15] = '\0';
++    buf[23] = '\0';
++    colors[SchemeNorm][ColBg] = buf + 16;
++    colors[SchemeSel][ColBg] = buf;
++}
++
+ int
+ main(int argc, char *argv[])
+ {
+ 	XWindowAttributes wa;
+ 	int i, fast = 0;
+ 
++    getwallcolors();
++
+ 	for (i = 1; i < argc; i++)
+ 		/* these options take no arguments */
+ 		if (!strcmp(argv[i], "-v")) {      /* prints version information */
+-- 
+2.29.2
+
