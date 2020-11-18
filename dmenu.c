@@ -33,6 +33,7 @@
      MAX(0, MIN((y) + (h), (r).y_org + (r).height) - MAX((y), (r).y_org)))
 #define LENGTH(X) (sizeof X / sizeof X[0])
 #define TEXTW(X) (drw_fontset_getwidth(drw, (X)) + lrpad)
+#define SAT0(X) ((X) < 0 ? 0 : (X))
 
 #ifndef NUM_THREADS
     #define NUM_THREADS 8
@@ -110,7 +111,6 @@ static void* count_slice(void* data) {
     struct item const* const end = slice->items + slice->len;
     size_t max_len = 0;
     for (struct item const* item = slice->items; item != end; item++) {
-        /* fprintf(stderr, "testing %s\n", item->text); */
         max_len = MAX(TEXTW(item->text), max_len);
     }
     slice->max_len = max_len;
@@ -122,7 +122,6 @@ static size_t max_textw(void) {
     static bool calculated = false;
     if (!calculated) {
         if (n_items > 200) {
-            fprintf(stderr, "using multithreaded code\n");
             struct slice slices[NUM_THREADS];
             pthread_t threads[NUM_THREADS];
             size_t ratio = n_items / NUM_THREADS;
@@ -134,7 +133,6 @@ static size_t max_textw(void) {
                     goto SERIAL;
                 }
             }
-            fprintf(stderr, "joining threads\n");
             for(size_t i = 0; i < NUM_THREADS; ++i) {
                 pthread_join(threads[i], NULL);
                 len = MAX(slices[i].max_len, len);
@@ -147,8 +145,6 @@ SERIAL:     ;
         }
         calculated = true;
     }
-    fprintf(stderr, "max_len: %zu\n", len);
-    exit(0);
     return len;
 }
 
@@ -715,7 +711,9 @@ static void setup(void) {
         if (centered) {
             mw = MIN(MAX(max_textw() + promptw, min_width), info[i].width);
             x = info[i].x_org + ((info[i].width - mw) / 2);
+            x = x < 0 ? 0 : x;
             y = info[i].y_org + ((info[i].height - mh) / 2);
+            y = y < 0 ? 0 : y;
         } else {
             x = info[i].x_org;
             y = info[i].y_org + (topbar ? 0 : info[i].height - mh);
@@ -732,7 +730,9 @@ static void setup(void) {
         if (centered) {
             mw = MIN(MAX(max_textw() + promptw, min_width), wa.width);
             x = (wa.width - mw) / 2;
+            x = SAT0(x);
             y = (wa.height - mh) / 2;
+            y = SAT0(y);
         } else {
             x = 0;
             y = topbar ? 0 : wa.height - mh;
