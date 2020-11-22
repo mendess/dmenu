@@ -800,24 +800,31 @@ static void usage(void) {
 }
 
 static void getwallcolors(void) {
-    static char buf[32] = {0};
+    static char buf[2024] = {0};
     int fd = open("/tmp/wall_colors", O_RDONLY);
     if (fd < 1) {
         perror("Failed to open '/tmp/wall_colors'");
         return;
     }
-    ssize_t bytes = read(fd, buf, 32);
+    ssize_t bytes = read(fd, buf, 2024);
     if (bytes == -1) {
         perror("Failed to read '/tmp/wall_colors'");
         return;
-    } else if (bytes < 24) {
-        return;
     }
-    buf[7] = '\0';
-    buf[15] = '\0';
-    buf[23] = '\0';
-    colors[SchemeNorm][ColBg] = buf + 16;
-    colors[SchemeSel][ColBg] = buf;
+    char* wall_colors[6];
+    wall_colors[0] = buf;
+    size_t colors_i = 1;
+    for (char* i = buf; i < buf + bytes; ++i) {
+        if(*i == '\n') {
+            *i = '\0';
+            if (colors_i < 6) wall_colors[colors_i++] = i + 1;
+        }
+    }
+    if (colors_i < 6) return;
+    colors[SchemeSel][ColBg] = wall_colors[0];
+    colors[SchemeNorm][ColBg] = wall_colors[2];
+    colors[SchemeSel][ColFg] = wall_colors[3][0] == 'w' ? "#FFFFFF" : "#000000";
+    colors[SchemeNorm][ColFg] = wall_colors[5][0] == 'w' ? "#FFFFFF" : "#000000";
 }
 
 int main(int argc, char* argv[]) {
