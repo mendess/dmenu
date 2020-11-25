@@ -820,9 +820,10 @@ static void getwallcolors(void) {
             if (colors_i < 6) wall_colors[colors_i++] = i + 1;
         }
     }
-    if (colors_i < 6) return;
+    if (colors_i < 3) return;
     colors[SchemeSel][ColBg] = wall_colors[0];
     colors[SchemeNorm][ColBg] = wall_colors[2];
+    if (colors_i < 6) return;
     colors[SchemeSel][ColFg] = wall_colors[3][0] == 'w' ? "#FFFFFF" : "#000000";
     colors[SchemeNorm][ColFg] = wall_colors[5][0] == 'w' ? "#FFFFFF" : "#000000";
 }
