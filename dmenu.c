@@ -1,7 +1,11 @@
 /* See LICENSE file for copyright and license details. */
+#include <X11/Xatom.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include <locale.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,13 +13,8 @@
 #include <strings.h>
 #include <time.h>
 #include <unistd.h>
-#include <pthread.h>
-
-#include <X11/Xlib.h>
-#include <X11/Xatom.h>
-#include <X11/Xutil.h>
 #ifdef XINERAMA
-#include <X11/extensions/Xinerama.h>
+#    include <X11/extensions/Xinerama.h>
 #endif
 #include <X11/Xft/Xft.h>
 
@@ -36,7 +35,7 @@
 #define SAT0(X) ((X) < 0 ? 0 : (X))
 
 #ifndef NUM_THREADS
-    #define NUM_THREADS 8
+#    define NUM_THREADS 8
 #endif
 
 /* enums */
@@ -125,20 +124,21 @@ static size_t max_textw(void) {
             struct slice slices[NUM_THREADS];
             pthread_t threads[NUM_THREADS];
             size_t ratio = n_items / NUM_THREADS;
-            for(size_t i = 0; i < NUM_THREADS; ++i) {
+            for (size_t i = 0; i < NUM_THREADS; ++i) {
                 slices[i].items = items + (i * ratio);
                 slices[i].len = ratio;
                 slices[i].max_len = 0;
-                if(pthread_create(threads + i, NULL, count_slice, slices + i) != 0) {
+                if (pthread_create(
+                        threads + i, NULL, count_slice, slices + i) != 0) {
                     goto SERIAL;
                 }
             }
-            for(size_t i = 0; i < NUM_THREADS; ++i) {
+            for (size_t i = 0; i < NUM_THREADS; ++i) {
                 pthread_join(threads[i], NULL);
                 len = MAX(slices[i].max_len, len);
             }
         } else {
-SERIAL:     ;
+        SERIAL:;
             struct slice slice = {.len = n_items, .items = items, .max_len = 0};
             count_slice(&slice);
             len = slice.max_len;
@@ -799,6 +799,10 @@ static void usage(void) {
     exit(1);
 }
 
+static char* checked_incr(char* ptr, char const* end, size_t incr) {
+    return end - ptr < incr ? NULL : ptr + incr;
+}
+
 static void getwallcolors(void) {
     static char buf[2024] = {0};
     int fd = open("/tmp/wall_colors", O_RDONLY);
@@ -811,21 +815,67 @@ static void getwallcolors(void) {
         perror("Failed to read '/tmp/wall_colors'");
         return;
     }
-    char* wall_colors[6];
-    wall_colors[0] = buf;
-    size_t colors_i = 1;
-    for (char* i = buf; i < buf + bytes; ++i) {
-        if(*i == '\n') {
-            *i = '\0';
-            if (colors_i < 6) wall_colors[colors_i++] = i + 1;
+
+#define N_WALL_COLORS 6
+#define RGBW 7
+
+    char* wall_colors[N_WALL_COLORS];
+    char* buf_iter = buf;
+    char const* const end = buf + bytes;
+    for (size_t i = 0; i < N_WALL_COLORS; ++i) {
+        wall_colors[i++] = buf_iter;
+        char test = buf_iter[RGBW];
+        buf_iter[RGBW] = '\0';
+        switch (test) {
+            case ' ':
+                wall_colors[i] = checked_incr(buf_iter, end, RGBW + 1);
+                if (!wall_colors[i]) {
+                    fprintf(
+                        stderr,
+                        "%zu: failed to store text color: %zu - %zu = %zu\n",
+                        i,
+                        (size_t)end,
+                        (size_t)buf_iter,
+                        end - buf_iter);
+                    return;
+                }
+
+                if (!(wall_colors[i][RGBW] == '\n')) {
+                    fprintf(
+                        stderr,
+                        "%zu: newline not found at the end of text color: %c",
+                        i,
+                        wall_colors[i][RGBW]);
+                    return;
+                }
+
+                wall_colors[i][RGBW] = '\0';
+                // 2 RGB values + a space and a \n
+                buf_iter = checked_incr(buf_iter, end, RGBW * 2 + 2);
+                break;
+            case '\n':
+                wall_colors[i] = NULL;
+                // one value + a \n
+                buf_iter = checked_incr(buf_iter, end, RGBW + 1);
+                break;
+            default:
+                fprintf(
+                    stderr,
+                    "%zu:default case because found: %c",
+                    i,
+                    test);
+                return;
+        }
+        if (!buf_iter) {
+            fprintf(stderr, "buf_iter became null\n");
+            return;
         }
     }
-    if (colors_i < 3) return;
-    colors[SchemeSel][ColBg] = wall_colors[0];
-    colors[SchemeNorm][ColBg] = wall_colors[2];
-    if (colors_i < 6) return;
-    colors[SchemeSel][ColFg] = wall_colors[3][0] == 'w' ? "#FFFFFF" : "#000000";
-    colors[SchemeNorm][ColFg] = wall_colors[5][0] == 'w' ? "#FFFFFF" : "#000000";
+#define CHECKED_SET(v, w) if((v)) (w) = (v);
+    CHECKED_SET(wall_colors[0], colors[SchemeSel][ColBg])
+    CHECKED_SET(wall_colors[1], colors[SchemeSel][ColFg])
+    CHECKED_SET(wall_colors[4], colors[SchemeNorm][ColBg])
+    CHECKED_SET(wall_colors[5], colors[SchemeNorm][ColFg])
 }
 
 int main(int argc, char* argv[]) {
