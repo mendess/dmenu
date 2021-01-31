@@ -2,7 +2,7 @@
 # See LICENSE file for copyright and license details.
 
 # dmenu version
-VERSION = 5.0
+VERSION = 5.1
 
 # paths
 ifndef PREFIX
@@ -96,5 +96,9 @@ uninstall:
 		$(DESTDIR)$(PREFIX)/bin/stest\
 		$(DESTDIR)$(MANPREFIX)/man1/dmenu.1\
 		$(DESTDIR)$(MANPREFIX)/man1/stest.1
+
+arch_install:
+	pkgver=$(VERSION) makepkg -si --clean
+	rm -f colour-dmenu-*-any.pkg.tar.zst
 
 .PHONY: all patches options clean dist install uninstall
