@@ -804,11 +804,32 @@ static char* checked_incr(char* ptr, char const* end, size_t incr) {
 }
 
 static void getwallcolors(void) {
-    static char buf[2024] = {0};
-    int fd = open("/tmp/wall_colors", O_RDONLY);
-    if (fd < 1) {
-        perror("Failed to open '/tmp/wall_colors'");
-        return;
+#define TMP "/tmp/"
+#define WALL_COLORS "/wall_colors"
+
+    static char buf[2048] = {0};
+    int fd;
+    {
+        size_t const tmp_len = strlen(TMP);
+        size_t const wall_colors_len = strlen(WALL_COLORS);
+        char filename[2048] = "/tmp/";
+        int r = getlogin_r(filename + tmp_len, sizeof filename - tmp_len - wall_colors_len - 1);
+        if (r != 0) goto NO_NAMESPACE;
+        strcat(filename, WALL_COLORS);
+        fd = open(filename, O_RDONLY);
+        if (fd < 1) {
+            perror("Failed to open " TMP "{username}" WALL_COLORS);
+        } else {
+            goto DONE;
+        }
+
+NO_NAMESPACE:
+        fd = open(TMP WALL_COLORS, O_RDONLY);
+        if (fd < 1) {
+            perror("Failed to open '/tmp/wall_colors'");
+            return;
+        }
+DONE: ;
     }
     ssize_t bytes = read(fd, buf, 2024);
     if (bytes == -1) {
