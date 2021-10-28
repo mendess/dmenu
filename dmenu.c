@@ -814,7 +814,10 @@ static void getwallcolors(void) {
         size_t const wall_colors_len = strlen(WALL_COLORS);
         char filename[2048] = "/tmp/";
         int r = getlogin_r(filename + tmp_len, sizeof filename - tmp_len - wall_colors_len - 1);
-        if (r != 0) goto NO_NAMESPACE;
+        if (r != 0) {
+            perror("Failed to get login name");
+            goto NO_NAMESPACE;
+        }
         strcat(filename, WALL_COLORS);
         fd = open(filename, O_RDONLY);
         if (fd < 1) {
