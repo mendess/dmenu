@@ -504,7 +504,7 @@ static void keypress(XKeyEvent* ev) {
             break;
         case XK_Escape:
             cleanup();
-            exit(1);
+            exit(0);
         case XK_Home:
             if (sel == matches) {
                 cursor = 0;
@@ -813,7 +813,9 @@ static void getwallcolors(void) {
         size_t const tmp_len = strlen(TMP);
         size_t const wall_colors_len = strlen(WALL_COLORS);
         char filename[2048] = "/tmp/";
-        int r = getlogin_r(filename + tmp_len, sizeof filename - tmp_len - wall_colors_len - 1);
+        int r = getlogin_r(
+            filename + tmp_len,
+            sizeof filename - tmp_len - wall_colors_len - 1);
         if (r != 0) {
             perror("Failed to get login name");
             goto NO_NAMESPACE;
@@ -826,13 +828,13 @@ static void getwallcolors(void) {
             goto DONE;
         }
 
-NO_NAMESPACE:
+    NO_NAMESPACE:
         fd = open(TMP WALL_COLORS, O_RDONLY);
         if (fd < 1) {
             perror("Failed to open '/tmp/wall_colors'");
             return;
         }
-DONE: ;
+    DONE:;
     }
     ssize_t bytes = read(fd, buf, 2024);
     if (bytes == -1) {
@@ -858,8 +860,8 @@ DONE: ;
                         stderr,
                         "%zu: failed to store text color: %zu - %zu = %zu\n",
                         i,
-                        (size_t)end,
-                        (size_t)buf_iter,
+                        (size_t) end,
+                        (size_t) buf_iter,
                         end - buf_iter);
                     return;
                 }
@@ -883,11 +885,7 @@ DONE: ;
                 buf_iter = checked_incr(buf_iter, end, RGBW + 1);
                 break;
             default:
-                fprintf(
-                    stderr,
-                    "%zu:default case because found: %c",
-                    i,
-                    test);
+                fprintf(stderr, "%zu:default case because found: %c", i, test);
                 return;
         }
         if (!buf_iter) {
@@ -895,7 +893,8 @@ DONE: ;
             return;
         }
     }
-#define CHECKED_SET(v, w) if((v)) (w) = (v);
+#define CHECKED_SET(v, w) \
+    if ((v)) (w) = (v);
     CHECKED_SET(wall_colors[0], colors[SchemeSel][ColBg])
     CHECKED_SET(wall_colors[1], colors[SchemeSel][ColFg])
     CHECKED_SET(wall_colors[4], colors[SchemeNorm][ColBg])

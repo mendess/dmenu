@@ -2,7 +2,7 @@
 # See LICENSE file for copyright and license details.
 
 # dmenu version
-VERSION = 5.3
+VERSION = 6.3
 
 # paths
 ifndef PREFIX
