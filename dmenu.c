@@ -149,19 +149,15 @@ static size_t max_textw(void) {
 }
 
 static void cleanup(void) {
-    size_t i;
-
     XUngrabKey(dpy, AnyKey, AnyModifier, root);
-    for (i = 0; i < SchemeLast; i++) free(scheme[i]);
+    for (size_t i = 0; i < SchemeLast; i++) free(scheme[i]);
     drw_free(drw);
     XSync(dpy, False);
     XCloseDisplay(dpy);
 }
 
 static char* cistrstr(const char* s, const char* sub) {
-    size_t len;
-
-    for (len = strlen(sub); *s; s++)
+    for (size_t len = strlen(sub); *s; s++)
         if (!strncasecmp(s, sub, len)) return (char*) s;
     return NULL;
 }
@@ -178,23 +174,21 @@ static int drawitem(struct item* item, int x, int y, int w) {
 }
 
 static void drawmenu(void) {
-    unsigned int curpos;
-    struct item* item;
-    int x = 0, y = 0, w;
-
     drw_setscheme(drw, scheme[SchemeNorm]);
     drw_rect(drw, 0, 0, mw, mh, 1, 1);
+
+    int x = 0;
 
     if (prompt && *prompt) {
         drw_setscheme(drw, scheme[SchemeSel]);
         x = drw_text(drw, x, 0, promptw, bh, lrpad / 2, prompt, 0);
     }
     /* draw input field */
-    w = (lines > 0 || !matches) ? mw - x : inputw;
+    int w = (lines > 0 || !matches) ? mw - x : inputw;
     drw_setscheme(drw, scheme[SchemeNorm]);
     drw_text(drw, x, 0, w, bh, lrpad / 2, text, 0);
 
-    curpos = TEXTW(text) - TEXTW(&text[cursor]);
+    unsigned int curpos = TEXTW(text) - TEXTW(&text[cursor]);
     if ((curpos += lrpad / 2 - 1) < w) {
         drw_setscheme(drw, scheme[SchemeNorm]);
         drw_rect(drw, x + curpos, 2, 2, bh - 4, 1, 0);
@@ -202,7 +196,8 @@ static void drawmenu(void) {
 
     if (lines > 0) {
         /* draw vertical list */
-        for (item = curr; item != next; item = item->right)
+        int y = 0;
+        for (struct item* item = curr; item != next; item = item->right)
             drawitem(item, x, y += bh, mw - x);
     } else if (matches) {
         /* draw horizontal list */
@@ -213,7 +208,7 @@ static void drawmenu(void) {
             drw_text(drw, x, 0, w, bh, lrpad / 2, "<", 0);
         }
         x += w;
-        for (item = curr; item != next; item = item->right)
+        for (struct item* item = curr; item != next; item = item->right)
             x = drawitem(
                 item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
         if (next) {
@@ -240,13 +235,11 @@ static void grabfocus(void) {
 }
 
 static void grabkeyboard(void) {
-    struct timespec ts = {.tv_sec = 0, .tv_nsec = 1000000};
-    int i;
 
     if (embed) return;
     /* try to grab keyboard, we may have to wait for another process to ungrab
      */
-    for (i = 0; i < 1000; i++) {
+    for (size_t i = 0; i < 1000; i++) {
         if (XGrabKeyboard(
                 dpy,
                 DefaultRootWindow(dpy),
@@ -256,31 +249,35 @@ static void grabkeyboard(void) {
                 CurrentTime) == GrabSuccess) {
             return;
         }
-        nanosleep(&ts, NULL);
+        nanosleep(&(struct timespec){.tv_sec = 0, .tv_nsec = 1000000}, NULL);
     }
     die("cannot grab keyboard");
 }
 
 static void match(void) {
     static char** tokv = NULL;
-    static int tokn = 0;
 
-    char buf[sizeof text], *s;
-    int i, tokc = 0;
-    size_t len, textsize;
-    struct item *item, *lprefix, *lsubstr, *prefixend, *substrend;
-
+    char buf[sizeof text];
     strcpy(buf, text);
     /* separate input text into tokens to be matched individually */
-    for (s = strtok(buf, " "); s; tokv[tokc - 1] = s, s = strtok(NULL, " "))
+    int tokc = 0;
+    char* s;
+    for (s = strtok(buf, " "); s; tokv[tokc - 1] = s, s = strtok(NULL, " ")) {
+        static int tokn = 0;
         if (++tokc > tokn && !(tokv = realloc(tokv, ++tokn * sizeof *tokv)))
             die("cannot realloc %u bytes:", tokn * sizeof *tokv);
-    len = tokc ? strlen(tokv[0]) : 0;
+    }
+    size_t len = tokc ? strlen(tokv[0]) : 0;
 
-    matches = lprefix = lsubstr = matchend = prefixend = substrend = NULL;
-    textsize = strlen(text) + 1;
-    for (item = items; item && item->text; item++) {
-        for (i = 0; i < tokc; i++)
+    struct item* lprefix = NULL;
+    struct item* lsubstr = NULL;
+    struct item* prefixend = NULL;
+    struct item* substrend = NULL;
+    matches = matchend = NULL;
+    size_t textsize = strlen(text) + 1;
+    for (struct item* item = items; item && item->text; item++) {
+        size_t i = 0;
+        for (; i < tokc; i++)
             if (!fstrstr(item->text, tokv[i])) break;
         if (i != tokc) /* not all tokens match */
             continue;
@@ -346,11 +343,10 @@ static void movewordedge(int dir) {
 
 static void keypress(XKeyEvent* ev) {
     char buf[32];
-    int len;
     KeySym ksym;
     Status status;
 
-    len = XmbLookupString(xic, ev, buf, sizeof buf, &ksym, &status);
+    int len = XmbLookupString(xic, ev, buf, sizeof buf, &ksym, &status);
     switch (status) {
         default: /* XLookupNone, XBufferOverflow */
             return;
@@ -572,7 +568,8 @@ draw:
 }
 
 static void paste(void) {
-    char *p, *q;
+    char* p;
+    char* q;
     int di;
     unsigned long dl;
     Atom da;
@@ -600,7 +597,9 @@ static void paste(void) {
 
 static void readstdin(void) {
     char buf[sizeof text], *p;
-    size_t i, imax = 0, size = 0;
+    size_t i;
+    size_t imax = 0;
+    size_t size = 0;
     unsigned int tmpmax = 0;
 
     /* read each line from stdin and add it to the item list */
@@ -656,20 +655,9 @@ static void run(void) {
 }
 
 static void setup(void) {
-    int x, y, i, j;
-    unsigned int du;
-    XSetWindowAttributes swa;
-    XIM xim;
     Window w, dw, *dws;
-    XWindowAttributes wa;
-    XClassHint ch = {"dmenu", "dmenu"};
-#ifdef XINERAMA
-    XineramaScreenInfo* info;
-    Window pw;
-    int a, di, n, area = 0;
-#endif
     /* init appearance */
-    for (j = 0; j < SchemeLast; j++)
+    for (size_t j = 0; j < SchemeLast; j++)
         scheme[j] = drw_scm_create(drw, colors[j], 2);
 
     clip = XInternAtom(dpy, "CLIPBOARD", False);
@@ -680,27 +668,38 @@ static void setup(void) {
     lines = MAX(lines, 0);
     mh = (lines + 1) * bh;
     promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
+    int x;
+    int y;
 #ifdef XINERAMA
-    i = 0;
+    size_t i = 0;
+    unsigned int du;
+    XineramaScreenInfo* info;
+    int n;
     if (parentwin == root && (info = XineramaQueryScreens(dpy, &n))) {
+        int area = 0;
+        int di;
         XGetInputFocus(dpy, &w, &di);
         if (mon >= 0 && mon < n)
             i = mon;
         else if (w != root && w != PointerRoot && w != None) {
             /* find top-level window containing current input focus */
+            Window pw;
             do {
                 if (XQueryTree(dpy, (pw = w), &dw, &w, &dws, &du) && dws)
                     XFree(dws);
             } while (w != root && w != pw);
             /* find xinerama screen with which the window intersects most */
-            if (XGetWindowAttributes(dpy, pw, &wa))
-                for (j = 0; j < n; j++)
+            XWindowAttributes wa;
+            if (XGetWindowAttributes(dpy, pw, &wa)) {
+                int a;
+                for (size_t j = 0; j < n; j++)
                     if ((a = INTERSECT(
                              wa.x, wa.y, wa.width, wa.height, info[j])) >
                         area) {
                         area = a;
                         i = j;
                     }
+            }
         }
         /* no focused window is on screen, so use pointer location instead */
         if (mon < 0 && !area &&
@@ -724,6 +723,7 @@ static void setup(void) {
     } else
 #endif
     {
+        XWindowAttributes wa;
         if (!XGetWindowAttributes(dpy, parentwin, &wa))
             die("could not get embedding window attributes: 0x%lx", parentwin);
 
@@ -742,6 +742,7 @@ static void setup(void) {
     inputw = MIN(inputw, mw / 3);
     match();
 
+    XSetWindowAttributes swa;
     /* create menu window */
     swa.override_redirect = True;
     swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
@@ -760,9 +761,11 @@ static void setup(void) {
         CWOverrideRedirect | CWBackPixel | CWEventMask,
         &swa);
     XSetWindowBorder(dpy, win, scheme[SchemeSel][ColBg].pixel);
+    XClassHint ch = {"dmenu", "dmenu"};
     XSetClassHint(dpy, win, &ch);
 
     /* input methods */
+    XIM xim;
     if ((xim = XOpenIM(dpy, NULL, NULL, NULL)) == NULL)
         die("XOpenIM failed: could not open input device");
 
@@ -902,12 +905,11 @@ static void getwallcolors(void) {
 }
 
 int main(int argc, char* argv[]) {
-    XWindowAttributes wa;
-    int i, fast = 0;
+    bool fast = false;
 
     getwallcolors();
 
-    for (i = 1; i < argc; i++)        /* these options take no arguments */
+    for (size_t i = 1; i < argc; i++) /* these options take no arguments */
         if (!strcmp(argv[i], "-v")) { /* prints version information */
             puts("dmenu-" VERSION);
             exit(0);
@@ -916,7 +918,7 @@ int main(int argc, char* argv[]) {
             topbar = 0;
         else if (!strcmp(
                      argv[i], "-f")) /* grabs keyboard before reading stdin */
-            fast = 1;
+            fast = true;
         else if (!strcmp(argv[i], "-t")) /* uncenters dmenu on screen */
             centered = 0;
         else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
@@ -953,6 +955,8 @@ int main(int argc, char* argv[]) {
     screen = DefaultScreen(dpy);
     root = RootWindow(dpy, screen);
     if (!embed || !(parentwin = strtol(embed, NULL, 0))) parentwin = root;
+
+    XWindowAttributes wa;
     if (!XGetWindowAttributes(dpy, parentwin, &wa))
         die("could not get embedding window attributes: 0x%lx", parentwin);
     drw = drw_create(dpy, screen, root, wa.width, wa.height);
@@ -973,6 +977,7 @@ int main(int argc, char* argv[]) {
     }
     setup();
     run();
+    fprintf(stderr, "this should be unreachable\n");
 
-    return 1; /* unreachable */
+    return 22; /* unreachable */
 }
